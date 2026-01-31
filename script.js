@@ -1,32 +1,41 @@
-// --- CONFIGURACIÓN DE DATOS LOCALES ---
+// --- CONFIGURACIÓN DE DATOS LOCALES (Sustituye a Firebase) ---
 let currentUser = localStorage.getItem('finanx_user');
-let financeHistory = JSON.parse(localStorage.getItem('finanx_history')) || {}; 
+let financeHistory = [];
+let myChart = null;
 
-// Lógica de Inicio de Sesión
+// Función para apagar el cargador manualmente si algo falla
+const hidePreloader = () => {
+    const preloader = document.getElementById('preloader');
+    if (preloader) preloader.style.display = 'none';
+};
+
+// --- LÓGICA DE INICIO DE SESIÓN ---
 document.getElementById('login-btn').onclick = () => {
     const name = document.getElementById('user-name').value.trim().toLowerCase();
     const pin = document.getElementById('user-pin').value;
 
     if (name && pin.length === 4) {
+        // Mostrar carga brevemente para efecto visual
         document.getElementById('preloader').style.display = 'flex';
         
-        // Simulación de base de datos local
+        // Base de datos de usuarios en LocalStorage
         const savedUsers = JSON.parse(localStorage.getItem('finanx_registered_users')) || {};
 
-        if (savedUsers[name]) {
-            // Si el usuario existe, verificamos el PIN
-            if (savedUsers[name] === pin) {
-                loginSuccess(name);
+        setTimeout(() => {
+            if (savedUsers[name]) {
+                if (savedUsers[name] === pin) {
+                    loginSuccess(name);
+                } else {
+                    alert("Security Error: Invalid PIN.");
+                    hidePreloader();
+                }
             } else {
-                alert("Security Error: Invalid PIN.");
-                document.getElementById('preloader').style.display = 'none';
+                // Registro de nuevo usuario
+                savedUsers[name] = pin;
+                localStorage.setItem('finanx_registered_users', JSON.stringify(savedUsers));
+                loginSuccess(name);
             }
-        } else {
-            // Registro de nuevo usuario en el navegador
-            savedUsers[name] = pin;
-            localStorage.setItem('finanx_registered_users', JSON.stringify(savedUsers));
-            loginSuccess(name);
-        }
+        }, 800); // Pequeña demora para que parezca que consulta la nube
     } else {
         alert("Enter Name and 4-digit PIN.");
     }
@@ -35,14 +44,17 @@ document.getElementById('login-btn').onclick = () => {
 function loginSuccess(name) {
     localStorage.setItem('finanx_user', name);
     currentUser = name;
+    
+    // Cambiar pantallas
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
     document.getElementById('welcome-user').innerText = `Hola, ${name.toUpperCase()}`;
+    
     loadData();
-    document.getElementById('preloader').style.display = 'none';
+    hidePreloader();
 }
 
-// Carga de datos desde LocalStorage
+// --- MANEJO DE DATOS ---
 function loadData() {
     const allHistory = JSON.parse(localStorage.getItem('finanx_history')) || {};
     financeHistory = allHistory[currentUser] || [];
@@ -50,15 +62,18 @@ function loadData() {
     if (financeHistory.length > 0) {
         const last = financeHistory[financeHistory.length - 1];
         updateCounters(last.income, last.expenses, last.savings);
+    } else {
+        updateCounters(0, 0, 0);
     }
     refreshVisuals();
 }
 
-async function runAnalysis() {
+function runAnalysis() {
     const inc = parseFloat(document.getElementById('income').value) || 0;
     const exp = parseFloat(document.getElementById('gastos').value) || 0;
+
     if (inc <= 0) {
-        alert("Please enter a valid income.");
+        alert("Por favor ingresa un ingreso válido.");
         return;
     }
 
@@ -69,14 +84,12 @@ async function runAnalysis() {
         savings: inc * 0.20
     };
 
-    // Obtener historial global y actualizar el del usuario actual
     const allHistory = JSON.parse(localStorage.getItem('finanx_history')) || {};
     if (!allHistory[currentUser]) allHistory[currentUser] = [];
     
     allHistory[currentUser].push(entry);
     financeHistory = allHistory[currentUser];
 
-    // Guardar de nuevo en LocalStorage
     localStorage.setItem('finanx_history', JSON.stringify(allHistory));
     
     updateCounters(inc, exp, entry.savings);
@@ -90,10 +103,11 @@ function updateCounters(i, e, s) {
     document.getElementById('display-savings').innerText = `$${s.toLocaleString()}`;
 }
 
+// --- ANÁLISIS Y GRÁFICOS ---
 function checkAffordability() {
     const cost = parseFloat(document.getElementById('item-cost').value) || 0;
     if (financeHistory.length === 0) {
-        alert("No data available. Run an analysis first.");
+        alert("Primero realiza un análisis de ingresos.");
         return;
     }
     
@@ -113,37 +127,37 @@ function refreshVisuals() {
     const chartElement = document.getElementById('financeChart');
     if (!chartElement) return;
     
-    const type = document.getElementById('chart-type').value;
     const ctx = chartElement.getContext('2d');
     if (myChart) myChart.destroy();
 
     const recent = financeHistory.slice(-6);
     myChart = new Chart(ctx, {
-        type: type,
+        type: 'bar', // Puedes cambiarlo a 'line'
         data: {
             labels: recent.map(i => new Date(i.date).toLocaleDateString()),
             datasets: [
-                { label: 'Outflow (Expenses)', data: recent.map(i => i.expenses), backgroundColor: '#ff4d4d' },
-                { label: 'Reserve (Savings)', data: recent.map(i => i.savings), backgroundColor: '#D4AF37' }
+                { label: 'Gastos', data: recent.map(i => i.expenses), backgroundColor: '#ff4d4d' },
+                { label: 'Ahorros', data: recent.map(i => i.savings), backgroundColor: '#D4AF37' }
             ]
         },
         options: { responsive: true, maintainAspectRatio: false }
     });
 }
 
-// Event Listeners
+// --- BOTONES Y EVENTOS ---
 document.getElementById('calculate-btn').onclick = runAnalysis;
 document.getElementById('affordability-btn').onclick = checkAffordability;
+
 document.getElementById('logout-btn').onclick = () => { 
     localStorage.removeItem('finanx_user'); 
     location.reload(); 
 };
 
-// Auto-login si ya existe sesión
-window.addEventListener('load', () => { 
+// Al cargar la página
+window.onload = () => { 
     if(currentUser) {
         loginSuccess(currentUser); 
     } else {
-        if(document.getElementById('preloader')) document.getElementById('preloader').style.display='none'; 
+        hidePreloader(); 
     }
-});
+};
