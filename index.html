@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinanX | Secure Cloud Wealth</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="preloader"><span class="loader"></span></div>
+
+<div id="auth-screen" class="auth-overlay">
+    <div class="auth-card glass-panel">
+        <div class="logo">FINAN<span>X</span></div>
+        <p class="security-badge"><i class="fa-solid fa-shield-halved"></i> Cloud Secure Mode</p>
+        
+        <div class="fx-field">
+            <label>Master Username</label>
+            <input type="text" id="user-name" placeholder="Ej. Alex">
+        </div>
+        <div class="fx-field">
+            <label>Secure PIN (4 Digits)</label>
+            <input type="password" id="user-pin" maxlength="4" placeholder="****" inputmode="numeric">
+        </div>
+        <button id="login-btn" class="fx-btn-prime">Unlock Vault</button>
+        <p class="auth-note">Data is encrypted via TLS/SSL.</p>
+    </div>
+</div>
+
+<div id="app-content" style="display:none;">
+    <header class="navbar">
+        <div class="logo">FINAN<span>X</span></div>
+        <nav class="menu">
+            <a href="#dashboard-section"><i class="fa-solid fa-coins"></i></a>
+            <a href="#affordability-section"><i class="fa-solid fa-piggy-bank"></i></a>
+            <button id="theme-toggle" class="fx-btn-outline icon-btn"><i class="fa-solid fa-moon"></i></button>
+            <div class="user-profile">
+                <i class="fa-solid fa-user"></i>
+                <span id="welcome-user">Hola, User</span>
+            </div>
+            <button id="logout-btn" class="fx-btn-danger icon-btn" title="Logout"><i class="fa-solid fa-power-off"></i></button>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section class="onboarding-guide glass-panel">
+            <details>
+                <summary><i class="fa-solid fa-graduation-cap"></i> New User? Click here for the Step-by-Step Guide</summary>
+                <div class="guide-steps">
+                    <p><strong>1. Register:</strong> Your PIN is your key. Don't lose it.</p>
+                    <p><strong>2. Analyze:</strong> Put your Income. The system saves 20% in the Cloud automatically.</p>
+                    <p><strong>3. Affordability:</strong> Check if a purchase is "convenient" based on months of life-work.</p>
+                </div>
+            </details>
+        </section>
+
+        <div class="metrics-grid">
+            <div class="fx-card">
+                <span class="label">Inflow</span>
+                <h3 class="fx-number" id="display-income">$0</h3>
+            </div>
+            <div class="fx-card">
+                <span class="label">Outflow</span>
+                <h3 class="fx-number" id="display-expenses">$0</h3>
+            </div>
+            <div class="fx-card fx-gold-card">
+                <span class="label">Reserve (20%)</span>
+                <h3 class="fx-number" id="display-savings">$0</h3>
+            </div>
+        </div>
+
+        <section id="dashboard-section" class="glass-panel">
+            <div class="fx-input-row">
+                <div class="fx-field"><label>Monthly Income</label><input type="number" id="income"></div>
+                <div class="fx-field"><label>Monthly Expenses</label><input type="number" id="gastos"></div>
+                <button id="calculate-btn" class="fx-btn-prime">Cloud Sync</button>
+            </div>
+        </section>
+
+        <section id="visuals-section" class="glass-panel">
+            <div class="analytics-row">
+                <div class="chart-wrapper"><canvas id="financeChart"></canvas></div>
+                <div class="action-stack">
+                    <button id="export-pdf" class="fx-btn-outline">Download Statement</button>
+                    <select id="chart-type" class="fx-select"><option value="doughnut">Totals</option><option value="bar">History</option></select>
+                </div>
+            </div>
+        </section>
+
+        <section id="affordability-section" class="glass-panel">
+            <h2 class="gold-text">Effort Analysis</h2>
+            <div class="fx-input-row">
+                <div class="fx-field"><label>Item Price</label><input type="number" id="item-cost"></div>
+                <button id="affordability-btn" class="fx-btn-prime">Verify</button>
+            </div>
+            <div id="verdict-container" class="verdict-box" style="display:none;">
+                <p id="effort-count"></p>
+                <p id="verdict-advice"></p>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
