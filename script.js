@@ -1,42 +1,30 @@
-// CONFIGURACIÓN FIREBASE (Reemplaza con tus datos de Firebase Console)
-const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_PROYECTO.firebaseapp.com",
-    databaseURL: "https://TU_PROYECTO.firebaseio.com",
-    projectId: "TU_PROYECTO",
-    storageBucket: "TU_PROYECTO.appspot.com",
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
-
+// --- CONFIGURACIÓN DE DATOS LOCALES ---
 let currentUser = localStorage.getItem('finanx_user');
-let financeHistory = [];
-let myChart = null;
+let financeHistory = JSON.parse(localStorage.getItem('finanx_history')) || {}; 
 
 // Lógica de Inicio de Sesión
-document.getElementById('login-btn').onclick = async () => {
+document.getElementById('login-btn').onclick = () => {
     const name = document.getElementById('user-name').value.trim().toLowerCase();
     const pin = document.getElementById('user-pin').value;
 
     if (name && pin.length === 4) {
         document.getElementById('preloader').style.display = 'flex';
         
-        // Verificamos o creamos usuario en Firebase
-        const userRef = db.ref('users/' + name);
-        const snapshot = await userRef.once('value');
-        const userData = snapshot.val();
+        // Simulación de base de datos local
+        const savedUsers = JSON.parse(localStorage.getItem('finanx_registered_users')) || {};
 
-        if (userData) {
-            if (userData.pin === pin) {
+        if (savedUsers[name]) {
+            // Si el usuario existe, verificamos el PIN
+            if (savedUsers[name] === pin) {
                 loginSuccess(name);
             } else {
                 alert("Security Error: Invalid PIN.");
-                location.reload();
+                document.getElementById('preloader').style.display = 'none';
             }
         } else {
-            // Registro de nuevo usuario
-            await userRef.set({ pin: pin, history: [] });
+            // Registro de nuevo usuario en el navegador
+            savedUsers[name] = pin;
+            localStorage.setItem('finanx_registered_users', JSON.stringify(savedUsers));
             loginSuccess(name);
         }
     } else {
@@ -54,22 +42,25 @@ function loginSuccess(name) {
     document.getElementById('preloader').style.display = 'none';
 }
 
-// Carga de datos desde el Servidor
-async function loadData() {
-    db.ref('users/' + currentUser + '/history').on('value', (snapshot) => {
-        financeHistory = snapshot.val() || [];
-        if (financeHistory.length > 0) {
-            const last = financeHistory[financeHistory.length - 1];
-            updateCounters(last.income, last.expenses, last.savings);
-        }
-        refreshVisuals();
-    });
+// Carga de datos desde LocalStorage
+function loadData() {
+    const allHistory = JSON.parse(localStorage.getItem('finanx_history')) || {};
+    financeHistory = allHistory[currentUser] || [];
+    
+    if (financeHistory.length > 0) {
+        const last = financeHistory[financeHistory.length - 1];
+        updateCounters(last.income, last.expenses, last.savings);
+    }
+    refreshVisuals();
 }
 
 async function runAnalysis() {
     const inc = parseFloat(document.getElementById('income').value) || 0;
     const exp = parseFloat(document.getElementById('gastos').value) || 0;
-    if (inc <= 0) return;
+    if (inc <= 0) {
+        alert("Please enter a valid income.");
+        return;
+    }
 
     const entry = {
         date: new Date().toISOString(),
@@ -78,10 +69,19 @@ async function runAnalysis() {
         savings: inc * 0.20
     };
 
-    financeHistory.push(entry);
-    // Guardado Seguro en el Servidor
-    await db.ref('users/' + currentUser + '/history').set(financeHistory);
+    // Obtener historial global y actualizar el del usuario actual
+    const allHistory = JSON.parse(localStorage.getItem('finanx_history')) || {};
+    if (!allHistory[currentUser]) allHistory[currentUser] = [];
+    
+    allHistory[currentUser].push(entry);
+    financeHistory = allHistory[currentUser];
+
+    // Guardar de nuevo en LocalStorage
+    localStorage.setItem('finanx_history', JSON.stringify(allHistory));
+    
     updateCounters(inc, exp, entry.savings);
+    refreshVisuals();
+    alert("Data Secured in Vault.");
 }
 
 function updateCounters(i, e, s) {
@@ -92,9 +92,12 @@ function updateCounters(i, e, s) {
 
 function checkAffordability() {
     const cost = parseFloat(document.getElementById('item-cost').value) || 0;
+    if (financeHistory.length === 0) {
+        alert("No data available. Run an analysis first.");
+        return;
+    }
+    
     const last = financeHistory[financeHistory.length - 1];
-    if (!last) return;
-
     const effort = (cost / last.income).toFixed(1);
     const totalSav = financeHistory.reduce((acc, curr) => acc + curr.savings, 0);
 
@@ -106,10 +109,12 @@ function checkAffordability() {
         : "UNSAFE: More saving required.";
 }
 
-// Gráficos y UI
 function refreshVisuals() {
+    const chartElement = document.getElementById('financeChart');
+    if (!chartElement) return;
+    
     const type = document.getElementById('chart-type').value;
-    const ctx = document.getElementById('financeChart').getContext('2d');
+    const ctx = chartElement.getContext('2d');
     if (myChart) myChart.destroy();
 
     const recent = financeHistory.slice(-6);
@@ -117,15 +122,28 @@ function refreshVisuals() {
         type: type,
         data: {
             labels: recent.map(i => new Date(i.date).toLocaleDateString()),
-            datasets: [{ label: 'Outflow', data: recent.map(i => i.expenses), backgroundColor: '#ff4d4d' },
-                       { label: 'Reserve', data: recent.map(i => i.savings), backgroundColor: '#D4AF37' }]
+            datasets: [
+                { label: 'Outflow (Expenses)', data: recent.map(i => i.expenses), backgroundColor: '#ff4d4d' },
+                { label: 'Reserve (Savings)', data: recent.map(i => i.savings), backgroundColor: '#D4AF37' }
+            ]
         },
         options: { responsive: true, maintainAspectRatio: false }
     });
 }
 
-// Handlers
+// Event Listeners
 document.getElementById('calculate-btn').onclick = runAnalysis;
 document.getElementById('affordability-btn').onclick = checkAffordability;
-document.getElementById('logout-btn').onclick = () => { localStorage.clear(); location.reload(); };
-window.addEventListener('load', () => { if(currentUser) loginSuccess(currentUser); else document.getElementById('preloader').style.display='none'; });
+document.getElementById('logout-btn').onclick = () => { 
+    localStorage.removeItem('finanx_user'); 
+    location.reload(); 
+};
+
+// Auto-login si ya existe sesión
+window.addEventListener('load', () => { 
+    if(currentUser) {
+        loginSuccess(currentUser); 
+    } else {
+        if(document.getElementById('preloader')) document.getElementById('preloader').style.display='none'; 
+    }
+});
